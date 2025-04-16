@@ -75,6 +75,7 @@ vim.keymap.set('i', '<C-l>', '<Right>', { desc = 'Right in insert mode' })
 vim.keymap.set('i', '<C-j>', '<Down>', { desc = 'Down in insert mode' })
 vim.keymap.set('i', '<C-k>', '<Up>', { desc = 'Up in insert mode' })
 vim.keymap.set('i', '<C-s>', '<cmd>wa<cr>', { desc = 'Save all in insert mode' })
+vim.keymap.set('n', '<C-s>', '<cmd>wa<cr>', { desc = 'Save all in normal mode' })
 
 vim.keymap.set({ 'i', 'n' }, '<A-j>', '<cmd>m .+1<cr>==', { desc = 'Move line up' })
 vim.keymap.set({ 'i', 'n' }, '<A-k>', '<cmd>m .-2<cr>==', { desc = 'Move line down' })
@@ -98,6 +99,25 @@ vim.keymap.set('n', '<leader>w', '<cmd>wa<cr>', { desc = 'Write all' })
 vim.keymap.set('n', '<leader>q', '<cmd>q<cr>', { desc = 'Quit' })
 
 vim.keymap.set('n', '<leader>t', '<cmd>terminal<cr>', { desc = 'Create new terminal' })
+--
+vim.keymap.set('n', '<leader>n', '<cmd>cnext<cr>', { silent = true, desc = 'Next item in quickfix list' })
+vim.keymap.set('n', '<leader>p', '<cmd>cprev<cr>', { silent = true, desc = 'Previous item in quickfix list' })
+
+vim.keymap.set('n', '<C-U>', '<C-U>zz', { noremap = true, silent = true })
+vim.keymap.set('n', '<C-D>', '<C-D>zz', { noremap = true, silent = true })
+vim.keymap.set('n', '<C-B>', '<C-B>zz', { noremap = true, silent = true })
+vim.keymap.set('n', '<C-F>', '<C-F>zz', { noremap = true, silent = true })
+
+-- Search and replace in the current file
+-- vim.api.nvim_set_keymap('n', '<leader>r', ':%s/', { noremap = true })
+
+vim.keymap.set('n', '<leader>rf', [[:lua vim.cmd("edit " .. vim.fn.system("uuidgen"):gsub("\n", "") .. ".yaml")<CR>]], { noremap = true, silent = true })
+vim.keymap.set(
+  'n',
+  '<Leader>rm',
+  ':!mcv % --template=cv/v2/main.tex --output=yurii-tereshchenko-cv.pdf && mcv % --template=cover_letter/variant_2/main.tex --output=yurii-tereshchenko-cover-letter.pdf<CR>',
+  { noremap = true }
+)
 
 vim.api.nvim_create_autocmd('TextYankPost', {
   desc = 'Highlight when yanking (copying) text',
@@ -132,12 +152,17 @@ require('lazy').setup({
       },
     },
   },
+  -- {
+  --   'brianhuster/autosave.nvim',
+  --   event = 'InsertEnter',
+  --   opts = {},
+  -- },
 
-  {
-    'yorik1984/zola.nvim',
-    ft = { 'zola', 'markdown' },
-    dependencies = 'Glench/Vim-Jinja2-Syntax',
-  },
+  -- {
+  --   'yorik1984/zola.nvim',
+  --   ft = { 'zola', 'markdown' },
+  --   dependencies = 'Glench/Vim-Jinja2-Syntax',
+  -- },
 
   {
     'folke/which-key.nvim',
@@ -219,10 +244,18 @@ require('lazy').setup({
         end,
       },
       { 'nvim-telescope/telescope-ui-select.nvim' },
+      { 'nvim-telescope/telescope-live-grep-args.nvim' },
       { 'nvim-tree/nvim-web-devicons', enabled = vim.g.have_nerd_font },
     },
     config = function()
+      local lga_actions = require 'telescope-live-grep-args.actions'
+      local actions = require 'telescope.actions'
       require('telescope').setup {
+        defaults = {
+          preview = {
+            filesize_limit = 0.5555,
+          },
+        },
         extensions = {
           ['ui-select'] = {
             require('telescope.themes').get_dropdown(),
@@ -235,11 +268,24 @@ require('lazy').setup({
               -- ['n'] = {},
             },
           },
+          live_grep_args = {
+            auto_quoting = true, -- enable/disable auto-quoting
+            -- define mappings, e.g.
+            mappings = { -- extend mappings
+              i = {
+                ['<C-k>'] = lga_actions.quote_prompt(),
+                ['<C-i>'] = lga_actions.quote_prompt { postfix = ' --iglob ' },
+                -- freeze the current list and start a fuzzy search in the frozen list
+                ['<C-space>'] = actions.to_fuzzy_refine,
+              },
+            },
+          },
         },
       }
       -- pcall(require('telescope').load_extension, 'file_browser')
       pcall(require('telescope').load_extension, 'fzf')
       pcall(require('telescope').load_extension, 'ui-select')
+      pcall(require('telescope').load_extension, 'telescope-live-grep-args')
       local builtin = require 'telescope.builtin'
       -- vim.keymap.set('n', '<space>e', ':Telescope file_browser<CR>')
       vim.keymap.set('n', '<leader>sh', builtin.help_tags, { desc = '[S]earch [H]elp' })
@@ -247,7 +293,7 @@ require('lazy').setup({
       vim.keymap.set('n', '<leader>sf', builtin.find_files, { desc = '[S]earch [F]iles' })
       vim.keymap.set('n', '<leader>ss', builtin.builtin, { desc = '[S]earch [S]elect Telescope' })
       vim.keymap.set('n', '<leader>sw', builtin.grep_string, { desc = '[S]earch current [W]ord' })
-      vim.keymap.set('n', '<leader>sg', builtin.live_grep, { desc = '[S]earch by [G]rep' })
+      vim.keymap.set('n', '<leader>sg', require('telescope').extensions.live_grep_args.live_grep_args, { desc = '[S]earch by [G]rep' })
       vim.keymap.set('n', '<leader>sd', builtin.diagnostics, { desc = '[S]earch [D]iagnostics' })
       vim.keymap.set('n', '<leader>sr', builtin.resume, { desc = '[S]earch [R]esume' })
       vim.keymap.set('n', '<leader>s.', builtin.oldfiles, { desc = '[S]earch Recent Files ("." for repeat)' })
@@ -279,27 +325,6 @@ require('lazy').setup({
     end,
   },
 
-  {
-    'hat0uma/csvview.nvim',
-    ft = { 'csv', 'tsv' },
-    config = function()
-      require('csvview').setup {
-        parser = {
-          async_chunksize = 50,
-          delimiter = {
-            default = ',',
-            ft = {
-              tsv = '\t',
-            },
-          },
-          view = {
-            min_column_width = 5,
-            display_mode = 'border',
-          },
-        },
-      }
-    end,
-  },
   {
     'neovim/nvim-lspconfig',
     dependencies = {
@@ -416,6 +441,7 @@ require('lazy').setup({
         typescriptreact = { 'prettierd' },
         javascript = { 'prettierd' },
         javascriptreact = { 'prettierd' },
+        vue = { 'prettierd' },
         json = { 'prettierd' },
         css = { 'prettierd' },
         html = { 'prettierd' },
@@ -599,6 +625,7 @@ require('lazy').setup({
   {
     'ellisonleao/gruvbox.nvim',
   },
+  { 'maxmx03/fluoromachine.nvim' },
   {
     'tingey21/telescope-colorscheme-persist.nvim',
     dependencies = { 'nvim-telescope/telescope.nvim' },
