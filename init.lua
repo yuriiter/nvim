@@ -55,7 +55,7 @@ vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>', { desc = 'Clear search highl
 vim.keymap.set('n', '<leader>l', toggle_bg_mod.toggle_background, { desc = 'Toggle Background Light/Dark' })
 vim.keymap.set('n', '<leader><Tab>d', '<cmd>tabclose<cr>', { desc = 'Close tab' })
 vim.keymap.set('n', '<leader>bd', '<cmd>bdelete<CR>', { desc = 'Delete Buffer' })
-vim.keymap.set('v', 'p', '"_dP', { desc = 'Paste without yanking' })
+-- vim.keymap.set('v', 'p', '"_dP', { desc = 'Paste without yanking' })
 vim.keymap.set('n', '<leader>e', ':Neotree toggle<CR>', { desc = 'Toggle Neo-tree' })
 vim.keymap.set('n', '<leader>o', ':Neotree focus<CR>', { desc = 'Focus Neo-tree' })
 vim.keymap.set('i', '<C-h>', '<Left>', { desc = 'Left in insert mode' })
@@ -91,6 +91,9 @@ vim.keymap.set(
   ':!mcv % --template=cv/v2/main.tex --output=yurii-tereshchenko-cv.pdf && mcv % --template=cover_letter/variant_2/main.tex --output=yurii-tereshchenko-cover-letter.pdf<CR>',
   { noremap = true }
 )
+
+vim.keymap.set('v', '<', '<gv', { desc = 'Unindent visual block (continuous)' })
+vim.keymap.set('v', '>', '>gv', { desc = 'Indent visual block (continuous)' })
 
 vim.api.nvim_create_autocmd('TextYankPost', {
   desc = 'Highlight when yanking (copying) text',
@@ -286,6 +289,33 @@ require('lazy').setup({
       'b0o/schemastore.nvim',
     },
     config = function()
+      local map = function(keys, func, desc)
+        vim.keymap.set('n', keys, func, { buffer = bufnr, desc = 'LSP: ' .. desc })
+      end
+
+      map('gd', require('telescope.builtin').lsp_definitions, '[G]oto [D]efinition')
+      map('gr', require('telescope.builtin').lsp_references, '[G]oto [R]eferences')
+      map('gI', require('telescope.builtin').lsp_implementations, '[G]oto [I]mplementation')
+      map('<leader>D', require('telescope.builtin').lsp_type_definitions, 'Type [D]efinition')
+      map('<leader>rn', vim.lsp.buf.rename, '[R]e[n]ame')
+      map('<leader>ca', vim.lsp.buf.code_action, '[C]ode [A]ction')
+      map('K', vim.lsp.buf.hover, 'Hover Documentation')
+      map('gD', vim.lsp.buf.declaration, '[G]oto [D]eclaration')
+      map('<leader>f', function()
+        vim.lsp.buf.format { async = true }
+      end, '[F]ormat Buffer')
+
+      map('[d', vim.diagnostic.goto_prev, 'Go to previous diagnostic')
+      map(']d', vim.diagnostic.goto_next, 'Go to next diagnostic')
+      map('<leader>d', vim.diagnostic.open_float, 'Show line diagnostics')
+      -- map('<leader>q', vim.diagnostic.setloclist, 'Set quickfix list from diagnostics')
+
+      map('<leader>th', function()
+        vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled())
+      end, '[T]oggle Inlay [H]ints')
+
+
+
       local on_attach = function(client, bufnr)
         local map = function(keys, func, desc)
           vim.keymap.set('n', keys, func, { buffer = bufnr, desc = 'LSP: ' .. desc })
