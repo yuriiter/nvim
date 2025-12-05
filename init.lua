@@ -92,8 +92,38 @@ vim.keymap.set(
   { noremap = true }
 )
 
+vim.keymap.set('n', '<leader>:', function()
+  require('telescope.builtin').commands({
+    -- Add custom configuration to execute on selection
+    attach_mappings = function(prompt_bufnr, map)
+      local actions = require('telescope.actions')
+
+      -- Map <CR> to close the picker and execute the command immediately
+      actions.select_default:enhance({
+        exec = function(_, entry)
+          actions.close(prompt_bufnr)
+          -- entry.value contains the command string (e.g., "qall!", "wa")
+          vim.cmd(entry.value)
+        end
+      })
+
+      return true -- Signal that the default mappings should be attached
+    end,
+    -- Custom prompt title for clarity
+    prompt_title = 'Plugin & Vim Commands'
+  })
+end, { desc = '[S]earch & Execute Commands (Telescope)' })
+
+-- Visual block indent/unindent continuously
 vim.keymap.set('v', '<', '<gv', { desc = 'Unindent visual block (continuous)' })
 vim.keymap.set('v', '>', '>gv', { desc = 'Indent visual block (continuous)' })
+
+-- Keymap for Aerial (new)
+-- vim.keymap.set('n', '<leader>at', '<cmd>AerialToggle<CR>', { desc = '[C]ode [A]erial Toggle' })
+
+-- Keymap for Markdown Preview (new)
+-- vim.keymap.set('n', '<leader>mp', '<cmd>MarkdownPreviewToggle<CR>', { desc = '[M]arkdown [P]review Toggle' })
+
 
 vim.api.nvim_create_autocmd('TextYankPost', {
   desc = 'Highlight when yanking (copying) text',
@@ -188,6 +218,7 @@ require('lazy').setup({
         { '<leader>h', group = 'Git [H]unk' },
         { '<leader>t', group = '[T]oggle' },
         { '<leader>w', group = '[W]orkspace' },
+        { '<leader>m', group = '[M]arkdown' }, -- New group for Markdown
       }
     end,
   },
@@ -199,6 +230,31 @@ require('lazy').setup({
     config = function()
       require('symbols-outline').setup()
     end,
+  },
+
+  -- Aerial Plugin (New)
+  -- {
+  --   'stevearc/aerial.nvim',
+  --   cmd = { 'AerialToggle', 'AerialInfo' },
+  --   keys = { { '<leader>at', '<cmd>AerialToggle<CR>', desc = 'Toggle [C]ode [A]erial Outline' } },
+  --   opts = {
+  --     close_on_select = true,
+  --     layout = {
+  --       max_width = 0.25,
+  --     },
+  --   },
+  -- },
+
+  -- Markdown Preview Plugin (New)
+  {
+    'iamcco/markdown-preview.nvim',
+    cmd = { 'MarkdownPreview', 'MarkdownPreviewToggle' },
+    ft = { 'markdown' },
+    build = 'cd app && npm install',
+    opts = {
+      auto_start = false,
+      -- Use a leader key mapping for convenience (already added in keymaps)
+    }
   },
 
   {
