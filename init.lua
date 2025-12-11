@@ -246,16 +246,16 @@ require('lazy').setup({
   -- },
 
   -- Markdown Preview Plugin (New)
-  {
-    'iamcco/markdown-preview.nvim',
-    cmd = { 'MarkdownPreview', 'MarkdownPreviewToggle' },
-    ft = { 'markdown' },
-    build = 'cd app && npm install',
-    opts = {
-      auto_start = false,
-      -- Use a leader key mapping for convenience (already added in keymaps)
-    }
-  },
+  -- {
+  --   'iamcco/markdown-preview.nvim',
+  --   cmd = { 'MarkdownPreview', 'MarkdownPreviewToggle' },
+  --   ft = { 'markdown' },
+  --   build = 'cd app && npm install',
+  --   opts = {
+  --     auto_start = false,
+  --     -- Use a leader key mapping for convenience (already added in keymaps)
+  --   }
+  -- },
 
   {
     'utilyre/barbecue.nvim',
