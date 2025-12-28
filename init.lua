@@ -726,7 +726,21 @@ require('lazy').setup({
       require('nvim-surround').setup()
     end,
   },
-
+  {
+    "ray-x/lsp_signature.nvim",
+    event = "VeryLazy",
+    opts = {
+      bind = true,
+      handler_opts = {
+        border = "rounded"
+      },
+      hint_enable = true,     -- Show a small hint next to the cursor
+      floating_window = true, -- Show a floating window with the full signature
+    },
+    config = function(_, opts)
+      require('lsp_signature').setup(opts)
+    end,
+  },
   {
     'folke/flash.nvim',
     event = 'VeryLazy',
