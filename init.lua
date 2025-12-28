@@ -49,6 +49,8 @@ vim.opt.inccommand = 'split'
 vim.opt.cursorline = true
 vim.opt.scrolloff = 10
 vim.opt.hlsearch = true
+vim.opt.cmdheight = 1
+vim.opt.shortmess:append "cW"
 
 -- Keymaps
 vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>', { desc = 'Clear search highlight' })
@@ -152,7 +154,7 @@ require('lazy').setup({
     end,
   },
 
-  { 'numToStr/Comment.nvim',      event = 'VeryLazy',     opts = {} },
+  { 'numToStr/Comment.nvim',    event = 'VeryLazy', opts = {} },
 
   {
     'lewis6991/gitsigns.nvim',
@@ -503,6 +505,7 @@ require('lazy').setup({
         follow_current_file = { enabled = true },
         hijack_netrw = true,
         use_libuv_file_watcher = true,
+        group_empty_dirs = true,
       },
       window = { width = 30, mappings = { ['\\'] = 'close_window' } },
       default_component_configs = {
@@ -597,9 +600,112 @@ require('lazy').setup({
     end,
   },
 
-  { 'ellisonleao/gruvbox.nvim',   name = 'gruvbox',       priority = 1000 },
+  { 'ellisonleao/gruvbox.nvim', name = 'gruvbox',   priority = 1000 },
+  -- 1. Catppuccin (Soft, pastel, very popular)
+  {
+    "catppuccin/nvim",
+    name = "catppuccin",
+    priority = 1000,
+    opts = {
+      flavour = "mocha", -- latte, frappe, macchiato, mocha
+      term_colors = true,
+      transparent_background = false,
+      integrations = {
+        cmp = true,
+        gitsigns = true,
+        neotree = true,
+        telescope = true,
+        treesitter = true,
+        mini = { enabled = true },
+      },
+    },
+  },
+
+  -- 2. Tokyo Night (Clean, professional, vibrant dark)
+  {
+    "folke/tokyonight.nvim",
+    lazy = false,
+    priority = 1000,
+    opts = {},
+  },
+
+  -- 3. Kanagawa (Inspired by Japanese art, desaturated, elegant)
+  {
+    "rebelot/kanagawa.nvim",
+    priority = 1000,
+    opts = {
+      transparent = false,
+      theme = "wave", -- wave, dragon, lotus
+      background = { dark = "wave", light = "lotus" },
+    },
+  },
+
+  -- 4. Nightfox (Highly customizable, has 7 variants like Nord, Terra, etc.)
+  {
+    "EdenEast/nightfox.nvim",
+    priority = 1000,
+  },
   { 'maxmx03/fluoromachine.nvim', name = 'fluoromachine', priority = 1000 },
   { 'Mofiqul/vscode.nvim',        name = 'vscode',        priority = 1000 },
+  {
+    'MagicDuck/grug-far.nvim',
+    config = function()
+      require('grug-far').setup({
+        -- options, see Configuration section below
+        -- there are no required options whatsoever
+      })
+    end,
+    keys = {
+      {
+        '<leader>rr',
+        function()
+          local grug = require('grug-far')
+          local ext = vim.bo.buftype == "" and vim.fn.expand("%:e")
+          grug.open({
+            transient = true,
+            prefills = {
+              filesFilter = ext and ext ~= "" and "*." .. ext or nil,
+            }
+          })
+        end,
+        mode = { 'n', 'v' },
+        desc = '[R]eplace [R]ipples (Global Search/Replace)',
+      },
+      {
+        '<leader>rw',
+        function()
+          require('grug-far').open({ prefills = { search = vim.fn.expand("<cword>") } })
+        end,
+        mode = { 'n' },
+        desc = '[R]eplace [W]ord (Global)',
+      },
+      {
+        '<leader>rf',
+        function()
+          require('grug-far').open({ prefills = { paths = vim.fn.expand("%") } })
+        end,
+        mode = { 'n' },
+        desc = '[R]eplace in Current [F]ile',
+      },
+    },
+  },
+  {
+    'NvChad/nvim-colorizer.lua',
+    event = 'BufReadPre',
+    opts = {
+      filetypes = { "*", "!lazy", "!popup" },
+      user_default_options = {
+        names = false,       -- "Name" codes like Blue or Red
+        rgb_fn = true,       -- CSS rgb() and rgba() functions
+        hsl_fn = true,       -- CSS hsl() and hsla() functions
+        css = true,          -- Enable all CSS features: rgb_fn, hsl_fn, names, RGB, RRGGBB
+        css_fn = true,       -- Enable all CSS *functions*: rgb_fn, hsl_fn
+        -- Available modes for `mode`: foreground, background,  virtualtext
+        mode = "background", -- Set the display mode.
+        tailwind = true,     -- Enable tailwind colors
+      },
+    },
+  },
   {
     'tingey21/telescope-colorscheme-persist.nvim',
     dependencies = { 'nvim-telescope/telescope.nvim' },
