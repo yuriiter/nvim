@@ -847,56 +847,95 @@ require('lazy').setup({
     end,
   },
 
+  -- nvim-treesitter on the `main` branch. The old `master` branch is frozen and
+  -- crashes on Neovim 0.12 (e.g. markdown fenced code blocks). On `main`,
+  -- highlighting and indentation have to be enabled manually.
   {
     'nvim-treesitter/nvim-treesitter',
+    branch = 'main',
+    lazy = false,
     build = ':TSUpdate',
-    dependencies = {
-      'nvim-treesitter/nvim-treesitter-textobjects',
-      'nvim-treesitter/nvim-treesitter-context',
-    },
-    opts = {
-      ensure_installed = {
+    init = function()
+      vim.api.nvim_create_autocmd('FileType', {
+        group = vim.api.nvim_create_augroup('user-treesitter', { clear = true }),
+        callback = function()
+          pcall(vim.treesitter.start)
+          vim.bo.indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+        end,
+      })
+    end,
+    config = function()
+      require('nvim-treesitter').setup {}
+      -- No-op for parsers that are already installed.
+      require('nvim-treesitter').install {
+        'astro',
         'bash',
         'c',
+        'cpp',
         'css',
+        'dockerfile',
+        'go',
+        'graphql',
         'html',
+        'java',
         'javascript',
         'json',
+        'latex',
         'lua',
         'markdown',
+        'markdown_inline',
+        'php',
+        'prisma',
         'python',
+        'ruby',
+        'rust',
         'scss',
+        'sql',
+        'svelte',
+        'terraform',
+        'toml',
         'tsx',
         'typescript',
         'vim',
+        'vimdoc',
         'vue',
         'yaml',
-        'go',
-        'java',
-        'php',
-        'ruby',
-      },
-      auto_install = true,
-      highlight = { enable = true },
-      indent = { enable = true },
-      textobjects = {
-        select = {
-          enable = true,
-          lookahead = true,
-          keymaps = {
-            ['af'] = '@function.outer',
-            ['if'] = '@function.inner',
-            ['ac'] = '@class.outer',
-            ['ic'] = '@class.inner',
-          },
-        },
-      },
-      context = { enable = true, max_lines = 3 },
-    },
-    config = function(_, opts)
-      require('nvim-treesitter.install').prefer_git = true
-      require('nvim-treesitter.configs').setup(opts)
+      }
     end,
+  },
+
+  {
+    'nvim-treesitter/nvim-treesitter-textobjects',
+    branch = 'main',
+    dependencies = { 'nvim-treesitter/nvim-treesitter' },
+    init = function()
+      -- Avoid clashes with the built-in ftplugin mappings.
+      vim.g.no_plugin_maps = true
+    end,
+    config = function()
+      require('nvim-treesitter-textobjects').setup {
+        select = { lookahead = true },
+        move = { set_jumps = true },
+      }
+
+      local select = require 'nvim-treesitter-textobjects.select'
+      local function textobject(query)
+        return function()
+          select.select_textobject(query, 'textobjects')
+        end
+      end
+      vim.keymap.set({ 'x', 'o' }, 'af', textobject '@function.outer', { desc = 'Around function' })
+      vim.keymap.set({ 'x', 'o' }, 'if', textobject '@function.inner', { desc = 'Inside function' })
+      vim.keymap.set({ 'x', 'o' }, 'ac', textobject '@class.outer', { desc = 'Around class' })
+      vim.keymap.set({ 'x', 'o' }, 'ic', textobject '@class.inner', { desc = 'Inside class' })
+    end,
+  },
+
+  {
+    'nvim-treesitter/nvim-treesitter-context',
+    dependencies = { 'nvim-treesitter/nvim-treesitter' },
+    event = 'VeryLazy',
+    opts = { max_lines = 3 },
   },
 }, {
   ui = {
