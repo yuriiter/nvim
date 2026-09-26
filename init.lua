@@ -312,12 +312,22 @@ require('lazy').setup({
   },
 
   -- ==========================================================================
-  -- LSP, FORMATTING, AND LINTING CONFIGURATION (THE IMPORTANT PART)
+  -- LSP, LINTING, AND FORMATTING
   -- ==========================================================================
+  -- Kept separate so `:Mason` works without loading the rest of the LSP stack.
+  {
+    'williamboman/mason.nvim',
+    cmd = 'Mason',
+    opts = {},
+  },
+
   {
     'neovim/nvim-lspconfig',
+    -- Lazy: the LSP stack is only pulled in once a real buffer is read.
+    -- Individual servers still start per filetype, so only needed ones run.
+    event = { 'BufReadPre', 'BufNewFile' },
     dependencies = {
-      { 'williamboman/mason.nvim', config = true },
+      'williamboman/mason.nvim',
       'williamboman/mason-lspconfig.nvim',
       'WhoIsSethDaniel/mason-tool-installer.nvim',
       { 'j-hui/fidget.nvim',      opts = {} },
@@ -330,9 +340,8 @@ require('lazy').setup({
       local capabilities = vim.lsp.protocol.make_client_capabilities()
       capabilities = vim.tbl_deep_extend('force', capabilities, require('cmp_nvim_lsp').default_capabilities())
 
-      -- Buffer-local LSP keymaps and breadcrumbs. Using LspAttach (instead of a
-      -- server on_attach) means this runs regardless of any on_attach a server
-      -- ships with in nvim-lspconfig.
+      -- Buffer-local keymaps + breadcrumbs. LspAttach runs even for servers that
+      -- ship their own on_attach, so nothing gets clobbered.
       vim.api.nvim_create_autocmd('LspAttach', {
         group = vim.api.nvim_create_augroup('user-lsp-attach', { clear = true }),
         callback = function(event)
@@ -350,9 +359,6 @@ require('lazy').setup({
           map('<leader>ca', vim.lsp.buf.code_action, '[C]ode [A]ction')
           map('K', vim.lsp.buf.hover, 'Hover Documentation')
           map('gD', vim.lsp.buf.declaration, '[G]oto [D]eclaration')
-          map('<leader>f', function()
-            vim.lsp.buf.format { async = true }
-          end, '[F]ormat Buffer')
 
           if client and client.server_capabilities.inlayHintProvider and vim.lsp.inlay_hint then
             map('<leader>th', function()
@@ -360,32 +366,50 @@ require('lazy').setup({
             end, '[T]oggle Inlay [H]ints')
           end
 
-          if client and client.server_capabilities.documentSymbolProvider then
+          -- navic supports a single client per buffer; skip if already attached.
+          if client and client.server_capabilities.documentSymbolProvider and vim.b[bufnr].navic_client_id == nil then
             require('nvim-navic').attach(client, bufnr)
           end
         end,
       })
 
-      -- Advertise cmp capabilities to every server
-      vim.lsp.config('*', {
-        capabilities = capabilities,
-      })
+      -- Advertise cmp capabilities to every server.
+      vim.lsp.config('*', { capabilities = capabilities })
 
-      -- Per-server overrides (merged on top of the defaults above)
+      -- Vue: vue_ls owns template + CSS/HTML, vtsls owns <script> through the
+      -- @vue/typescript-plugin bundled with mason's vue-language-server.
+      local vue_ts_plugin = vim.fn.stdpath 'data' .. '/mason/packages/vue-language-server/node_modules/@vue/language-server'
+      local vue_plugins = vim.uv.fs_stat(vue_ts_plugin) and {
+        {
+          name = '@vue/typescript-plugin',
+          location = vue_ts_plugin,
+          languages = { 'vue' },
+          configNamespace = 'typescript',
+          enableForWorkspaceTypeScriptVersions = true,
+        },
+      } or {}
+
+      -- Per-server overrides (merged on top of the wildcard defaults above).
       local servers = {
         lua_ls = {
           settings = { Lua = { workspace = { checkThirdParty = false }, telemetry = { enable = false }, completion = { callSnippet = 'Replace' } } },
         },
-        -- VTSLS is the single server for TS, JS, and Vue
         vtsls = {
-          filetypes = { 'javascript', 'javascriptreact', 'javascript.jsx', 'typescript', 'typescriptreact', 'typescript.tsx', 'vue' },
+          filetypes = { 'javascript', 'javascriptreact', 'typescript', 'typescriptreact', 'vue' },
           settings = {
-            vtsls = { enableMoveToFileCodeAction = true, autoUseWorkspaceTsdk = true },
+            vtsls = {
+              enableMoveToFileCodeAction = true,
+              autoUseWorkspaceTsdk = true,
+              tsserver = { globalPlugins = vue_plugins },
+            },
             typescript = { updateImportsOnFileMove = { enabled = 'always' }, suggest = { completeFunctionCalls = true } },
           },
         },
         jsonls = {
           settings = { json = { schemas = require('schemastore').json.schemas(), validate = { enable = true } } },
+        },
+        yamlls = {
+          settings = { yaml = { schemaStore = { enable = false }, schemas = require('schemastore').yaml.schemas() } },
         },
         eslint = {
           settings = { quiet = true, workingDirectories = { mode = 'auto' } },
@@ -396,21 +420,29 @@ require('lazy').setup({
         vim.lsp.config(server, config)
       end
 
-      -- Servers to install and enable
+      -- Installed by mason, enabled here. Each one only starts when a matching
+      -- filetype is opened.
       local ensure_installed = {
-        'lua_ls',
-        'vtsls', -- The ONLY server needed for Vue/TS/JS
-        'eslint',
-        'jsonls',
-        'cssls',
-        'html',
-        'tailwindcss',
-        'pyright',
-        'yamlls',
-        'bashls',
+        -- web / markup / styles
+        'vtsls', 'vue_ls', 'eslint', 'jsonls', 'cssls', 'html', 'tailwindcss',
+        'emmet_language_server', 'astro', 'svelte', 'graphql', 'prismals',
+        -- scripting / config
+        'lua_ls', 'bashls', 'vimls',
+        -- python
+        'pyright', 'ruff',
+        -- systems
+        'clangd', 'gopls', 'rust_analyzer',
+        -- other languages
+        'jdtls', 'phpactor', 'ruby_lsp',
+        -- data / docs / infra
+        'yamlls', 'taplo', 'marksman', 'texlab', 'sqls',
+        'dockerls', 'docker_compose_language_service', 'terraformls', 'ansiblels', 'helm_ls',
       }
 
-      require('mason').setup()
+      local mason = require 'mason'
+      if not mason.has_setup then
+        mason.setup()
+      end
 
       require('mason-lspconfig').setup {
         ensure_installed = ensure_installed,
@@ -418,35 +450,112 @@ require('lazy').setup({
       }
 
       require('mason-tool-installer').setup {
-        ensure_installed = { 'stylua', 'prettierd', 'black', 'isort' },
+        ensure_installed = {
+          -- formatters
+          'stylua', 'prettierd', 'black', 'isort', 'goimports',
+          'clang-format', 'php-cs-fixer', 'rubocop', 'shfmt',
+          -- linters
+          'shellcheck', 'hadolint', 'markdownlint', 'luacheck', 'yamllint',
+        },
+        run_on_start = true,
       }
 
       vim.lsp.enable(ensure_installed)
     end,
   },
 
+  -- Linter bridge for languages without an LSP (or where a CLI linter is
+  -- better). Runs on save/leave and only for the filetypes configured below.
+  {
+    'mfussenegger/nvim-lint',
+    event = { 'BufReadPre', 'BufNewFile' },
+    config = function()
+      require('lint').linters_by_ft = {
+        bash = { 'shellcheck' },
+        sh = { 'shellcheck' },
+        zsh = { 'shellcheck' },
+        dockerfile = { 'hadolint' },
+        markdown = { 'markdownlint' },
+        lua = { 'luacheck' },
+        yaml = { 'yamllint' },
+      }
+
+      vim.api.nvim_create_autocmd({ 'BufWritePost', 'InsertLeave' }, {
+        group = vim.api.nvim_create_augroup('user-lint', { clear = true }),
+        callback = function()
+          require('lint').try_lint()
+        end,
+      })
+    end,
+  },
+
   {
     'stevearc/conform.nvim',
-    lazy = false,
+    -- Lazy: loads on the first save (or when <leader>f is used).
+    event = { 'BufWritePre' },
+    cmd = { 'ConformInfo' },
+    keys = {
+      {
+        '<leader>f',
+        function()
+          require('conform').format { async = true, lsp_format = 'fallback' }
+        end,
+        desc = '[F]ormat buffer',
+      },
+    },
     opts = {
       notify_on_error = false,
-      format_on_save = { lsp_fallback = true, timeout_ms = 500 },
+      -- Format on save whenever a formatter (or an LSP with formatting) exists.
+      format_on_save = function(bufnr)
+        if vim.g.disable_autoformat or vim.b[bufnr].disable_autoformat then
+          return
+        end
+        return { timeout_ms = 1000, lsp_format = 'fallback' }
+      end,
       formatters_by_ft = {
         lua = { 'stylua' },
-        typescript = { 'prettierd' },
-        typescriptreact = { 'prettierd' },
+        python = { 'isort', 'black' },
         javascript = { 'prettierd' },
         javascriptreact = { 'prettierd' },
-        vue = { 'prettierd' }, -- Use prettierd for Vue
+        typescript = { 'prettierd' },
+        typescriptreact = { 'prettierd' },
+        vue = { 'prettierd' },
+        astro = { 'prettierd' },
+        svelte = { 'prettierd' },
         json = { 'prettierd' },
+        jsonc = { 'prettierd' },
         css = { 'prettierd' },
         scss = { 'prettierd' },
+        less = { 'prettierd' },
         html = { 'prettierd' },
         markdown = { 'prettierd' },
         yaml = { 'prettierd' },
-        python = { 'black', 'isort' },
+        graphql = { 'prettierd' },
+        go = { 'goimports' },
+        c = { 'clang-format' },
+        cpp = { 'clang-format' },
+        rust = { 'rustfmt' },
+        php = { 'php_cs_fixer' },
+        ruby = { 'rubocop' },
+        sh = { 'shfmt' },
+        bash = { 'shfmt' },
+        zsh = { 'shfmt' },
       },
     },
+    init = function()
+      vim.o.formatexpr = "v:lua.require'conform'.formatexpr()"
+      vim.api.nvim_create_user_command('FormatDisable', function(args)
+        if args.bang then
+          vim.b.disable_autoformat = true
+        else
+          vim.g.disable_autoformat = true
+        end
+      end, { desc = 'Disable autoformat-on-save', bang = true })
+      vim.api.nvim_create_user_command('FormatEnable', function()
+        vim.b.disable_autoformat = false
+        vim.g.disable_autoformat = false
+      end, { desc = 'Re-enable autoformat-on-save' })
+    end,
   },
 
   {
