@@ -3,8 +3,6 @@
 -- ====================================================
 local toggle_bg_mod = require 'custom.plugins.toggle_bg'
 
-vim.loader.enable()
-
 local lazyrepo = 'https://github.com/folke/lazy.nvim.git'
 local lazypath = vim.fn.stdpath 'data' .. '/lazy/lazy.nvim'
 
@@ -12,6 +10,12 @@ vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 vim.g.loaded_netrw = 1
 vim.g.loaded_netrwPlugin = 1
+
+-- Disable providers we don't use (silences checkhealth noise)
+vim.g.loaded_perl_provider = 0
+vim.g.loaded_ruby_provider = 0
+vim.g.loaded_python3_provider = 0
+vim.g.loaded_node_provider = 0
 
 -- Indentation settings
 vim.o.tabstop = 2
@@ -31,7 +35,6 @@ vim.opt.relativenumber = true
 vim.opt.pumheight = 8
 vim.opt.mouse = 'a'
 vim.opt.showmode = false
-vim.opt.lazyredraw = true
 vim.opt.clipboard = 'unnamedplus'
 vim.opt.breakindent = true
 vim.opt.swapfile = false
@@ -39,7 +42,7 @@ vim.opt.undofile = true
 vim.opt.ignorecase = true
 vim.opt.smartcase = true
 vim.opt.signcolumn = 'yes'
-vim.opt.updatetime = 10
+vim.opt.updatetime = 250
 vim.opt.timeoutlen = 300
 vim.opt.splitright = true
 vim.opt.splitbelow = true
@@ -49,6 +52,7 @@ vim.opt.inccommand = 'split'
 vim.opt.cursorline = true
 vim.opt.scrolloff = 10
 vim.opt.hlsearch = true
+vim.opt.termguicolors = true
 vim.opt.cmdheight = 1
 vim.opt.shortmess:append "cW"
 
@@ -75,18 +79,28 @@ vim.keymap.set('n', '<C-j>', '<C-w><C-j>', { desc = 'Move focus to the lower win
 vim.keymap.set('n', '<C-k>', '<C-w><C-k>', { desc = 'Move focus to the upper window' })
 vim.keymap.set('n', '<S-h>', 'gT', { desc = 'Move to the previous tab' })
 vim.keymap.set('n', '<S-l>', 'gt', { desc = 'Move to the next tab' })
-vim.keymap.set('n', '<leader>b', '<cmd>tabedit<cr>', { desc = 'Create new tab' })
+vim.keymap.set('n', '<leader><Tab>n', '<cmd>tabedit<cr>', { desc = 'Create new tab' })
 vim.keymap.set('n', '<leader>w', '<cmd>wa<cr>', { desc = 'Write all' })
 vim.keymap.set('n', '<leader>q', '<cmd>q<cr>', { desc = 'Quit' })
-vim.keymap.set('n', '<leader>t', '<cmd>terminal<cr>', { desc = 'Create new terminal' })
+vim.keymap.set('n', '<leader>T', '<cmd>terminal<cr>', { desc = 'Create new terminal' })
 vim.keymap.set('n', '<leader>n', '<cmd>cnext<cr>', { silent = true, desc = 'Next item in quickfix list' })
 vim.keymap.set('n', '<leader>p', '<cmd>cprev<cr>', { silent = true, desc = 'Previous item in quickfix list' })
 vim.keymap.set('n', '<C-U>', '<C-U>zz', { noremap = true, silent = true, desc = 'Scroll half page up, center cursor' })
 vim.keymap.set('n', '<C-D>', '<C-D>zz', { noremap = true, silent = true, desc = 'Scroll half page down, center cursor' })
 vim.keymap.set('n', '<C-B>', '<C-B>zz', { noremap = true, silent = true, desc = 'Scroll full page up, center cursor' })
 vim.keymap.set('n', '<C-F>', '<C-F>zz', { noremap = true, silent = true, desc = 'Scroll full page down, center cursor' })
-vim.keymap.set('n', '<leader>rf', [[:lua vim.cmd("edit " .. vim.fn.system("uuidgen"):gsub("\n", "") .. ".yaml")<CR>]],
-  { noremap = true, silent = true })
+
+-- Diagnostics (work with or without an attached LSP server)
+vim.keymap.set('n', '[d', vim.diagnostic.goto_prev, { desc = 'Previous diagnostic' })
+vim.keymap.set('n', ']d', vim.diagnostic.goto_next, { desc = 'Next diagnostic' })
+vim.keymap.set('n', '<leader>d', vim.diagnostic.open_float, { desc = 'Show line diagnostics' })
+
+vim.keymap.set(
+  'n',
+  '<leader>nf',
+  [[:lua vim.cmd("edit " .. vim.fn.system("uuidgen"):gsub("\n", "") .. ".yaml")<CR>]],
+  { noremap = true, silent = true, desc = 'New UUID-named YAML file' }
+)
 vim.keymap.set(
   'n',
   '<Leader>rm',
@@ -120,13 +134,6 @@ end, { desc = '[S]earch & Execute Commands (Telescope)' })
 vim.keymap.set('v', '<', '<gv', { desc = 'Unindent visual block (continuous)' })
 vim.keymap.set('v', '>', '>gv', { desc = 'Indent visual block (continuous)' })
 
--- Keymap for Aerial (new)
--- vim.keymap.set('n', '<leader>at', '<cmd>AerialToggle<CR>', { desc = '[C]ode [A]erial Toggle' })
-
--- Keymap for Markdown Preview (new)
--- vim.keymap.set('n', '<leader>mp', '<cmd>MarkdownPreviewToggle<CR>', { desc = '[M]arkdown [P]review Toggle' })
-
-
 vim.api.nvim_create_autocmd('TextYankPost', {
   desc = 'Highlight when yanking (copying) text',
   group = vim.api.nvim_create_augroup('kickstart-highlight-yank', { clear = true }),
@@ -136,7 +143,7 @@ vim.api.nvim_create_autocmd('TextYankPost', {
 })
 
 -- Lazy.nvim setup
-if not vim.loop.fs_stat(lazypath) then
+if not vim.uv.fs_stat(lazypath) then
   vim.fn.system { 'git', 'clone', '--filter=blob:none', '--branch=stable', lazyrepo, lazypath }
 end
 vim.opt.rtp:prepend(lazypath)
@@ -226,38 +233,11 @@ require('lazy').setup({
   },
 
   {
-    'simrat39/symbols-outline.nvim',
-    cmd = 'SymbolsOutline',
-    keys = { { '<leader>cs', '<cmd>SymbolsOutline<CR>', desc = '[C]ode [S]ymbols Outline' } },
-    config = function()
-      require('symbols-outline').setup()
-    end,
+    'hedyhli/outline.nvim',
+    cmd = { 'Outline', 'OutlineOpen' },
+    keys = { { '<leader>cs', '<cmd>Outline<CR>', desc = '[C]ode [S]ymbols Outline' } },
+    opts = {},
   },
-
-  -- Aerial Plugin (New)
-  -- {
-  --   'stevearc/aerial.nvim',
-  --   cmd = { 'AerialToggle', 'AerialInfo' },
-  --   keys = { { '<leader>at', '<cmd>AerialToggle<CR>', desc = 'Toggle [C]ode [A]erial Outline' } },
-  --   opts = {
-  --     close_on_select = true,
-  --     layout = {
-  --       max_width = 0.25,
-  --     },
-  --   },
-  -- },
-
-  -- Markdown Preview Plugin (New)
-  -- {
-  --   'iamcco/markdown-preview.nvim',
-  --   cmd = { 'MarkdownPreview', 'MarkdownPreviewToggle' },
-  --   ft = { 'markdown' },
-  --   build = 'cd app && npm install',
-  --   opts = {
-  --     auto_start = false,
-  --     -- Use a leader key mapping for convenience (already added in keymaps)
-  --   }
-  -- },
 
   {
     'utilyre/barbecue.nvim',
@@ -311,7 +291,7 @@ require('lazy').setup({
       }
       pcall(require('telescope').load_extension, 'fzf')
       pcall(require('telescope').load_extension, 'ui-select')
-      pcall(require('telescope').load_extension, 'telescope-live-grep-args')
+      pcall(require('telescope').load_extension, 'live_grep_args')
       local builtin = require 'telescope.builtin'
 
       vim.keymap.set('n', '<leader>sh', builtin.help_tags, { desc = '[S]earch [H]elp' })
@@ -340,77 +320,58 @@ require('lazy').setup({
       { 'williamboman/mason.nvim', config = true },
       'williamboman/mason-lspconfig.nvim',
       'WhoIsSethDaniel/mason-tool-installer.nvim',
-      { 'j-hui/fidget.nvim',       opts = {} },
-      { 'folke/neodev.nvim',       opts = {} },
+      { 'j-hui/fidget.nvim',      opts = {} },
+      { 'folke/lazydev.nvim',     ft = 'lua', opts = {} },
       'hrsh7th/cmp-nvim-lsp',
       'SmiteshP/nvim-navic',
       'b0o/schemastore.nvim',
     },
     config = function()
-      local map = function(keys, func, desc)
-        vim.keymap.set('n', keys, func, { buffer = bufnr, desc = 'LSP: ' .. desc })
-      end
-
-      map('gd', require('telescope.builtin').lsp_definitions, '[G]oto [D]efinition')
-      map('gr', require('telescope.builtin').lsp_references, '[G]oto [R]eferences')
-      map('gI', require('telescope.builtin').lsp_implementations, '[G]oto [I]mplementation')
-      map('<leader>D', require('telescope.builtin').lsp_type_definitions, 'Type [D]efinition')
-      map('<leader>rn', vim.lsp.buf.rename, '[R]e[n]ame')
-      map('<leader>ca', vim.lsp.buf.code_action, '[C]ode [A]ction')
-      map('K', vim.lsp.buf.hover, 'Hover Documentation')
-      map('gD', vim.lsp.buf.declaration, '[G]oto [D]eclaration')
-      map('<leader>f', function()
-        vim.lsp.buf.format { async = true }
-      end, '[F]ormat Buffer')
-
-      map('[d', vim.diagnostic.goto_prev, 'Go to previous diagnostic')
-      map(']d', vim.diagnostic.goto_next, 'Go to next diagnostic')
-      map('<leader>d', vim.diagnostic.open_float, 'Show line diagnostics')
-      -- map('<leader>q', vim.diagnostic.setloclist, 'Set quickfix list from diagnostics')
-
-      map('<leader>th', function()
-        vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled())
-      end, '[T]oggle Inlay [H]ints')
-
-
-
-      local on_attach = function(client, bufnr)
-        local map = function(keys, func, desc)
-          vim.keymap.set('n', keys, func, { buffer = bufnr, desc = 'LSP: ' .. desc })
-        end
-
-        map('gd', require('telescope.builtin').lsp_definitions, '[G]oto [D]efinition')
-        map('gr', require('telescope.builtin').lsp_references, '[G]oto [R]eferences')
-        map('gI', require('telescope.builtin').lsp_implementations, '[G]oto [I]mplementation')
-        map('<leader>D', require('telescope.builtin').lsp_type_definitions, 'Type [D]efinition')
-        map('<leader>rn', vim.lsp.buf.rename, '[R]e[n]ame')
-        map('<leader>ca', vim.lsp.buf.code_action, '[C]ode [A]ction')
-        map('K', vim.lsp.buf.hover, 'Hover Documentation')
-        map('gD', vim.lsp.buf.declaration, '[G]oto [D]eclaration')
-        map('<leader>f', function()
-          vim.lsp.buf.format { async = true }
-        end, '[F]ormat Buffer')
-
-        map('[d', vim.diagnostic.goto_prev, 'Go to previous diagnostic')
-        map(']d', vim.diagnostic.goto_next, 'Go to next diagnostic')
-        map('<leader>d', vim.diagnostic.open_float, 'Show line diagnostics')
-        -- map('<leader>q', vim.diagnostic.setloclist, 'Set quickfix list from diagnostics')
-
-        if client and client.server_capabilities.inlayHintProvider and vim.lsp.inlay_hint then
-          map('<leader>th', function()
-            vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled())
-          end, '[T]oggle Inlay [H]ints')
-        end
-
-        if client.server_capabilities.documentSymbolProvider then
-          require('nvim-navic').attach(client, bufnr)
-        end
-      end
-
       local capabilities = vim.lsp.protocol.make_client_capabilities()
       capabilities = vim.tbl_deep_extend('force', capabilities, require('cmp_nvim_lsp').default_capabilities())
 
-      -- Define server configurations
+      -- Buffer-local LSP keymaps and breadcrumbs. Using LspAttach (instead of a
+      -- server on_attach) means this runs regardless of any on_attach a server
+      -- ships with in nvim-lspconfig.
+      vim.api.nvim_create_autocmd('LspAttach', {
+        group = vim.api.nvim_create_augroup('user-lsp-attach', { clear = true }),
+        callback = function(event)
+          local bufnr = event.buf
+          local client = vim.lsp.get_client_by_id(event.data.client_id)
+          local map = function(keys, func, desc)
+            vim.keymap.set('n', keys, func, { buffer = bufnr, desc = 'LSP: ' .. desc })
+          end
+
+          map('gd', require('telescope.builtin').lsp_definitions, '[G]oto [D]efinition')
+          map('gr', require('telescope.builtin').lsp_references, '[G]oto [R]eferences')
+          map('gI', require('telescope.builtin').lsp_implementations, '[G]oto [I]mplementation')
+          map('<leader>D', require('telescope.builtin').lsp_type_definitions, 'Type [D]efinition')
+          map('<leader>rn', vim.lsp.buf.rename, '[R]e[n]ame')
+          map('<leader>ca', vim.lsp.buf.code_action, '[C]ode [A]ction')
+          map('K', vim.lsp.buf.hover, 'Hover Documentation')
+          map('gD', vim.lsp.buf.declaration, '[G]oto [D]eclaration')
+          map('<leader>f', function()
+            vim.lsp.buf.format { async = true }
+          end, '[F]ormat Buffer')
+
+          if client and client.server_capabilities.inlayHintProvider and vim.lsp.inlay_hint then
+            map('<leader>th', function()
+              vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled())
+            end, '[T]oggle Inlay [H]ints')
+          end
+
+          if client and client.server_capabilities.documentSymbolProvider then
+            require('nvim-navic').attach(client, bufnr)
+          end
+        end,
+      })
+
+      -- Advertise cmp capabilities to every server
+      vim.lsp.config('*', {
+        capabilities = capabilities,
+      })
+
+      -- Per-server overrides (merged on top of the defaults above)
       local servers = {
         lua_ls = {
           settings = { Lua = { workspace = { checkThirdParty = false }, telemetry = { enable = false }, completion = { callSnippet = 'Replace' } } },
@@ -429,20 +390,13 @@ require('lazy').setup({
         eslint = {
           settings = { quiet = true, workingDirectories = { mode = 'auto' } },
         },
-        -- Add other servers here as needed
-        pyright = {},
-        cssls = {},
-        html = {},
-        yamlls = {},
-        bashls = {},
-        tailwindcss = {},
-        -- etc.
       }
 
-      -- Mason setup
-      require('mason').setup()
+      for server, config in pairs(servers) do
+        vim.lsp.config(server, config)
+      end
 
-      -- List of LSPs to ensure are installed
+      -- Servers to install and enable
       local ensure_installed = {
         'lua_ls',
         'vtsls', -- The ONLY server needed for Vue/TS/JS
@@ -456,17 +410,18 @@ require('lazy').setup({
         'bashls',
       }
 
+      require('mason').setup()
+
       require('mason-lspconfig').setup {
         ensure_installed = ensure_installed,
-        handlers = {
-          function(server_name)
-            local server_config = servers[server_name] or {}
-            server_config.capabilities = vim.tbl_deep_extend('force', {}, capabilities, server_config.capabilities or {})
-            server_config.on_attach = on_attach
-            require('lspconfig')[server_name].setup(server_config)
-          end,
-        },
+        automatic_enable = false,
       }
+
+      require('mason-tool-installer').setup {
+        ensure_installed = { 'stylua', 'prettierd', 'black', 'isort' },
+      }
+
+      vim.lsp.enable(ensure_installed)
     end,
   },
 
@@ -657,7 +612,7 @@ require('lazy').setup({
     end,
     keys = {
       {
-        '<leader>rr',
+        '<leader>rs',
         function()
           local grug = require('grug-far')
           local ext = vim.bo.buftype == "" and vim.fn.expand("%:e")
@@ -711,7 +666,10 @@ require('lazy').setup({
     dependencies = { 'nvim-telescope/telescope.nvim' },
     lazy = false,
     config = function()
-      require('telescope-colorscheme-persist').setup { keybind = '<leader>sc' }
+      require('telescope-colorscheme-persist').setup {
+        keybind = '<leader>sc',
+        fallback = 'tokyonight',
+      }
     end,
   },
 
@@ -851,11 +809,5 @@ require('lazy').setup({
   },
 })
 
-local map = function(keys, func, desc)
-  vim.keymap.set('n', keys, func, { buffer = bufnr, desc = 'LSP: ' .. desc })
-end
-map('<leader>d', vim.diagnostic.open_float, 'Show line diagnostics')
-
--- Set a default colorscheme after all plugins are loaded
--- vim.cmd 'colorscheme vscode'
--- vim.o.background = 'dark'
+-- The active colorscheme is restored by telescope-colorscheme-persist
+-- (fallback: tokyonight). Change it with <leader>sc.
