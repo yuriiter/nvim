@@ -61,6 +61,8 @@ vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>', { desc = 'Clear search highl
 vim.keymap.set('n', '<leader>l', toggle_bg_mod.toggle_background, { desc = 'Toggle Background Light/Dark' })
 vim.keymap.set('n', '<leader><Tab>d', '<cmd>tabclose<cr>', { desc = 'Close tab' })
 vim.keymap.set('n', '<leader>bd', '<cmd>bdelete<CR>', { desc = 'Delete Buffer' })
+vim.keymap.set('n', '<Tab>', '<cmd>bnext<CR>', { desc = 'Next buffer' })
+vim.keymap.set('n', '<S-Tab>', '<cmd>bprevious<CR>', { desc = 'Previous buffer' })
 -- vim.keymap.set('v', 'p', '"_dP', { desc = 'Paste without yanking' })
 vim.keymap.set('n', '<leader>e', ':Neotree toggle<CR>', { desc = 'Toggle Neo-tree' })
 vim.keymap.set('n', '<leader>o', ':Neotree focus<CR>', { desc = 'Focus Neo-tree' })
@@ -83,6 +85,7 @@ vim.keymap.set('n', '<leader><Tab>n', '<cmd>tabedit<cr>', { desc = 'Create new t
 vim.keymap.set('n', '<leader>w', '<cmd>wa<cr>', { desc = 'Write all' })
 vim.keymap.set('n', '<leader>q', '<cmd>q<cr>', { desc = 'Quit' })
 vim.keymap.set('n', '<leader>T', '<cmd>terminal<cr>', { desc = 'Create new terminal' })
+vim.keymap.set('n', '<leader>t', '<cmd>terminal<cr>', { desc = 'Create new terminal' })
 vim.keymap.set('n', '<leader>n', '<cmd>cnext<cr>', { silent = true, desc = 'Next item in quickfix list' })
 vim.keymap.set('n', '<leader>p', '<cmd>cprev<cr>', { silent = true, desc = 'Previous item in quickfix list' })
 vim.keymap.set('n', '<C-U>', '<C-U>zz', { noremap = true, silent = true, desc = 'Scroll half page up, center cursor' })
@@ -139,6 +142,55 @@ vim.api.nvim_create_autocmd('TextYankPost', {
   group = vim.api.nvim_create_augroup('kickstart-highlight-yank', { clear = true }),
   callback = function()
     vim.highlight.on_yank()
+  end,
+})
+
+-- Autosave: debounce writes while editing, and save on insert leave / focus loss.
+local autosave_group = vim.api.nvim_create_augroup('user-autosave', { clear = true })
+local autosave_skip_ft = { 'neo-tree', 'lazy', 'mason', 'telescope', 'help', 'oil', 'gitcommit' }
+
+local function autosave(bufnr)
+  if not vim.api.nvim_buf_is_valid(bufnr) then
+    return
+  end
+  if not vim.bo[bufnr].modified or vim.bo[bufnr].buftype ~= '' then
+    return
+  end
+  if vim.tbl_contains(autosave_skip_ft, vim.bo[bufnr].filetype) then
+    return
+  end
+  if vim.api.nvim_get_option_value('readonly', { buf = bufnr }) then
+    return
+  end
+  vim.api.nvim_buf_call(bufnr, function()
+    vim.cmd 'silent! write'
+  end)
+end
+
+local autosave_timers = {}
+vim.api.nvim_create_autocmd({ 'TextChanged', 'TextChangedI' }, {
+  group = autosave_group,
+  callback = function(args)
+    local bufnr = args.buf
+    if autosave_timers[bufnr] then
+      autosave_timers[bufnr]:stop()
+      autosave_timers[bufnr]:close()
+    end
+    local timer = vim.uv.new_timer()
+    autosave_timers[bufnr] = timer
+    timer:start(1000, 0, vim.schedule_wrap(function()
+      autosave(bufnr)
+      timer:stop()
+      timer:close()
+      autosave_timers[bufnr] = nil
+    end))
+  end,
+})
+
+vim.api.nvim_create_autocmd({ 'InsertLeave', 'FocusLost', 'BufLeave' }, {
+  group = autosave_group,
+  callback = function(args)
+    autosave(args.buf)
   end,
 })
 
