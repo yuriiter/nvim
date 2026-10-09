@@ -60,7 +60,7 @@ vim.opt.shortmess:append "cW"
 vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>', { desc = 'Clear search highlight' })
 vim.keymap.set('n', '<leader>l', toggle_bg_mod.toggle_background, { desc = 'Toggle Background Light/Dark' })
 vim.keymap.set('n', '<leader><Tab>d', '<cmd>tabclose<cr>', { desc = 'Close tab' })
-vim.keymap.set('n', '<leader>bd', '<cmd>bdelete<CR>', { desc = 'Delete Buffer' })
+vim.keymap.set('n', '<leader>b', '<cmd>tabedit<CR>', { desc = 'New tab' })
 vim.keymap.set('n', '<Tab>', '<cmd>bnext<CR>', { desc = 'Next buffer' })
 vim.keymap.set('n', '<S-Tab>', '<cmd>bprevious<CR>', { desc = 'Previous buffer' })
 -- vim.keymap.set('v', 'p', '"_dP', { desc = 'Paste without yanking' })
